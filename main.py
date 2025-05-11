@@ -27,7 +27,7 @@ def init_db():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
+                login TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL
             )
         ''')
@@ -54,7 +54,7 @@ class Track(BaseModel):
     user_id: int  # добавляем сюда ID пользователя
 
 class User(BaseModel):
-    username: str
+    login: str
     password: str
 
 class Follow(BaseModel):
@@ -114,18 +114,18 @@ def submit_track(user: User):
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         # Проверка существования пользователя
-        cursor.execute("SELECT password FROM users WHERE username = ?", (user.username,))
+        cursor.execute("SELECT password FROM users WHERE login = ?", (user.login,))
         row = cursor.fetchone()
 
         if row is None:
             # Новый пользователь — создаём
-            cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (user.username, user.password))
+            cursor.execute("INSERT INTO users (login, password) VALUES (?, ?)", (user.login, user.password))
             conn.commit()
             user_id = cursor.lastrowid
             return {"status": "registered", "user_id": user_id}
         elif row[0] == user.password:
             # Пароль совпал — вход разрешён
-            cursor.execute("SELECT id FROM users WHERE username = ?", (user.username,))
+            cursor.execute("SELECT id FROM users WHERE login = ?", (user.login,))
             user_id = cursor.fetchone()[0]
             return {"status": "ok", "user_id": user_id}
         else:
