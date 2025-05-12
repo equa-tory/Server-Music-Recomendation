@@ -63,6 +63,11 @@ class Follow(BaseModel):
 
 @app.post("/submit")
 def submit_track(track: Track):
+    # Проверка и генерация ссылки, если она пустая
+    if not track.url.strip():
+        query = f"{track.title} {track.author}".strip().replace(" ", "+")
+        track.url = f"https://www.youtube.com/results?search_query={query}"
+
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute('''
