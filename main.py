@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import sqlite3
 import os
 
@@ -46,12 +46,12 @@ init_db()
 
 # Pydantic модель
 class Track(BaseModel):
-    title: str
-    author: str
-    url: str
+    title: str = Field(..., min_length=2, max_length=30)
+    author: str = Field(..., min_length=2, max_length=22)
+    url: str = Field(..., max_length=120)
     mood: int
     comment: str
-    user_id: int  # добавляем сюда ID пользователя
+    user_id: int
 
 class User(BaseModel):
     login: str
@@ -78,7 +78,7 @@ def submit_track(track: Track):
     return {"status": "ok"}
 
 @app.get("/tracks")
-def get_tracks(user_id: int, page: int = 1, limit: int = 5):
+def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none"):
     offset = (page - 1) * limit
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
@@ -86,12 +86,27 @@ def get_tracks(user_id: int, page: int = 1, limit: int = 5):
         cursor.execute("SELECT COUNT(*) FROM tracks")
         total = cursor.fetchone()[0]
 
-        cursor.execute('''
-            SELECT id, title, author, url, mood, comment, timestamp
-            FROM tracks
-            ORDER BY timestamp DESC
+        # Определяем порядок сортировки
+        if sort == "popular":
+            order_by = "(SELECT COUNT(*) FROM follows WHERE track_id = t.id) DESC"
+        elif sort == "followed":
+            order_by = "CASE WHEN f.user_id = ? THEN 0 ELSE 1 END, t.timestamp DESC"
+        elif sort == "week":
+            order_by = "(SELECT COUNT(*) FROM follows WHERE track_id = t.id AND DATE(timestamp) >= DATE('now', '-7 day')) DESC"
+        else:
+            order_by = "t.timestamp DESC"
+
+        query = f'''
+            SELECT t.id, t.title, t.author, t.url, t.mood, t.comment, t.timestamp
+            FROM tracks t
+            LEFT JOIN follows f ON t.id = f.track_id
+            ORDER BY {order_by}
             LIMIT ? OFFSET ?
-        ''', (limit, offset))
+        '''
+        if sort == "followed":
+            cursor.execute(query, (user_id, limit, offset))
+        else:
+            cursor.execute(query, (limit, offset))
         rows = cursor.fetchall()
 
         cursor.execute("SELECT track_id FROM follows WHERE user_id = ?", (user_id,))
