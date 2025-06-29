@@ -67,11 +67,11 @@ def init_db():
         if cursor.fetchone()[0] == 0:
             cursor.execute("""
                 INSERT INTO moods (id, name) VALUES
-                (1, '👻 Other'),
-                (2, '💥 Drive'),
-                (3, '🛋️ Chill'),
-                (4, '💔 Sad'),
-                (5, '❄ Christmas')
+                (0, '👻 Other'),
+                (1, '💥 Drive'),
+                (2, '🛋️ Chill'),
+                (3, '💔 Sad'),
+                (4, '❄ Christmas')
             """)
             
 init_db()
