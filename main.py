@@ -7,7 +7,8 @@ app = FastAPI()
 
 DB_FILE = "tracks.db"
 
-# Автосоздание таблицы при запуске
+# ----------------------------------------------------------------
+# table creation
 def init_db():
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
@@ -62,7 +63,8 @@ def init_db():
         ''')
 init_db()
 
-# Pydantic модель
+# ----------------------------------------------------------------
+# classes
 class Track(BaseModel):
     title: str = Field(..., min_length=2, max_length=30)
     author: str = Field(..., min_length=2, max_length=22)
@@ -87,9 +89,11 @@ class Report(BaseModel):
 class DeleteRequest(BaseModel):
     track_id: int
 
+# ----------------------------------------------------------------
+# requests
 @app.post("/submit")
 def submit_track(track: Track):
-    # Проверка и генерация ссылки, если она пустая
+    # Link generation check if it's null
     if not track.url.strip():
         query = f"{track.title} {track.author}".strip().replace(" ", "+")
         track.url = f"https://www.youtube.com/results?search_query={query}"
@@ -158,9 +162,7 @@ def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none", 
         cursor.execute("SELECT COUNT(*) FROM tracks")
         total = cursor.fetchone()[0]
 
-        print("!!!!SORT: ", sort);
-
-        # Определяем порядок сортировки
+        # sort selection
         if sort == "popular":
             order_by = "(SELECT COUNT(*) FROM follows WHERE track_id = t.id) DESC"
         elif sort == "followed":
@@ -220,23 +222,23 @@ def submit_track(user: User):
         raise HTTPException(status_code=400, detail="Login and password must be 2–16 characters long")
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
-        # Проверка существования пользователя
+        # User existance check
         cursor.execute("SELECT password FROM users WHERE login = ?", (user.login,))
         row = cursor.fetchone()
 
         if row is None:
-            # Новый пользователь — создаём
+            # Creating new user
             cursor.execute("INSERT INTO users (login, password) VALUES (?, ?)", (user.login, user.password))
             conn.commit()
             user_id = cursor.lastrowid
             return {"status": "registered", "user_id": user_id}
         elif row[0] == user.password:
-            # Пароль совпал — вход разрешён
+            # Password is right
             cursor.execute("SELECT id FROM users WHERE login = ?", (user.login,))
             user_id = cursor.fetchone()[0]
             return {"status": "ok", "user_id": user_id}
         else:
-            # Пароль неверный
+            # Wrong password
             raise HTTPException(status_code=401, detail="Invalid password")
 
 @app.post("/follow")
