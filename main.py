@@ -51,7 +51,7 @@ def init_db():
             )
         ''')
         cursor.execute('''
-            CREATE TABLE reports (
+            CREATE TABLE IF NOT EXISTS reports (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 sender_id INTEGER,
                 track_id INTEGER,
@@ -65,13 +65,14 @@ def init_db():
         # moods table filler
         cursor.execute("SELECT COUNT(*) FROM moods")
         if cursor.fetchone()[0] == 0:
-            cursor.executemany("INSERT INTO moods (id, name) VALUES (?, ?)", [
+            cursor.execute("""
+                INSERT INTO moods (id, name) VALUES
                 (1, '👻 Other'),
                 (2, '💥 Drive'),
                 (3, '🛋️ Chill'),
                 (4, '💔 Sad'),
                 (5, '❄ Christmas')
-            ])
+            """)
             
 init_db()
 
@@ -142,7 +143,7 @@ def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none", 
             total = cursor.fetchone()[0]
 
             query = '''
-                SELECT t.id, t.title, t.author, t.url, t.mood_id, t.comment, t.timestamp
+                SELECT DISTINCT t.id, t.title, t.author, t.url, t.mood_id, t.comment, t.timestamp
                 FROM tracks t
                 WHERE t.user_id = ?
                 ORDER BY t.timestamp DESC
