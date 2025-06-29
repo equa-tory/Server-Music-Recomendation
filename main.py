@@ -61,6 +61,18 @@ def init_db():
                 FOREIGN KEY(track_id) REFERENCES tracks(id)
             )
         ''')
+        
+        # moods table filler
+        cursor.execute("SELECT COUNT(*) FROM moods")
+        if cursor.fetchone()[0] == 0:
+            cursor.executemany("INSERT INTO moods (id, name) VALUES (?, ?)", [
+                (1, '👻 Other'),
+                (2, '💥 Drive'),
+                (3, '🛋️ Chill'),
+                (4, '💔 Sad'),
+                (5, '❄ Christmas')
+            ])
+            
 init_db()
 
 # ----------------------------------------------------------------
