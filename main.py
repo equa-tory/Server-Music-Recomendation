@@ -12,18 +12,29 @@ def init_db():
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute('''
+            CREATE TABLE IF NOT EXISTS moods (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            )
+        ''')
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS tracks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 author TEXT NOT NULL,
                 url TEXT NOT NULL,
-                mood INTEGER,
-                comment TEXT,
+                mood_id INTEGER,
+                "comment" TEXT,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 user_id INTEGER NOT NULL,
+                FOREIGN KEY(mood_id) REFERENCES moods(id),
                 FOREIGN KEY(user_id) REFERENCES users(id)
             )
         ''')
+        #          TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD
+        #      TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD
+        # TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD
+        #    TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +60,7 @@ class Track(BaseModel):
     title: str = Field(..., min_length=2, max_length=30)
     author: str = Field(..., min_length=2, max_length=22)
     url: str = Field(..., max_length=120)
-    mood: int
+    mood_id: int
     comment: str
     user_id: int
 
@@ -74,9 +85,9 @@ def submit_track(track: Track):
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO tracks (title, author, url, mood, comment, user_id)
+            INSERT INTO tracks (title, author, url, mood_id, comment, user_id)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', (track.title, track.author, track.url, track.mood, track.comment, track.user_id))
+        ''', (track.title, track.author, track.url, track.mood_id, track.comment, track.user_id))
         conn.commit()
     return {"status": "ok"}
 
@@ -103,7 +114,7 @@ def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none", 
             total = cursor.fetchone()[0]
 
             query = '''
-                SELECT t.id, t.title, t.author, t.url, t.mood, t.comment, t.timestamp
+                SELECT t.id, t.title, t.author, t.url, t.mood_id, t.comment, t.timestamp
                 FROM tracks t
                 WHERE t.user_id = ?
                 ORDER BY t.timestamp DESC
@@ -123,7 +134,7 @@ def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none", 
                         "title": row[1],
                         "author": row[2],
                         "url": row[3],
-                        "mood": row[4],
+                        "mood_id": row[4],
                         "comment": row[5],
                         "timestamp": row[6]
                     }
@@ -135,6 +146,8 @@ def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none", 
         cursor.execute("SELECT COUNT(*) FROM tracks")
         total = cursor.fetchone()[0]
 
+        print("!!!!SORT: ", sort);
+
         # Определяем порядок сортировки
         if sort == "popular":
             order_by = "(SELECT COUNT(*) FROM follows WHERE track_id = t.id) DESC"
@@ -144,12 +157,12 @@ def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none", 
             order_by = "(SELECT COUNT(*) FROM follows WHERE track_id = t.id AND DATE(timestamp) >= DATE('now', '-7 day')) DESC"
         elif "mood" in sort:
             mood_index = int(sort.split(":")[1])
-            order_by = f"t.mood = {mood_index} DESC"
+            order_by = f"t.mood_id = {mood_index} DESC"
         else:
             order_by = "t.timestamp DESC"
 
         query = f'''
-            SELECT t.id, t.title, t.author, t.url, t.mood, t.comment, t.timestamp
+            SELECT t.id, t.title, t.author, t.url, t.mood_id, t.comment, t.timestamp
             FROM tracks t
             LEFT JOIN follows f ON t.id = f.track_id
             ORDER BY {order_by}
@@ -172,7 +185,7 @@ def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none", 
                     "title": row[1],
                     "author": row[2],
                     "url": row[3],
-                    "mood": row[4],
+                    "mood_id": row[4],
                     "comment": row[5],
                     "timestamp": row[6]
                 }
@@ -180,6 +193,14 @@ def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none", 
             ],
             "followed_ids": followed_ids
         }
+    
+@app.get("/moods")
+def get_moods():
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name FROM moods")
+        rows = cursor.fetchall()
+        return [{"id": row[0], "name": row[1]} for row in rows]
 
 @app.post("/user")
 def submit_track(user: User):
@@ -225,7 +246,7 @@ def get_followed_tracks(user_id: int):
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT t.id, t.title, t.author, t.url, t.mood, t.comment, t.timestamp
+            SELECT t.id, t.title, t.author, t.url, t.mood_id, t.comment, t.timestamp
             FROM tracks t
             JOIN follows f ON t.id = f.track_id
             WHERE f.user_id = ?
@@ -238,7 +259,7 @@ def get_followed_tracks(user_id: int):
                 "title": row[1],
                 "author": row[2],
                 "url": row[3],
-                "mood": row[4],
+                "mood_id": row[4],
                 "comment": row[5],
                 "timestamp": row[6]
             }
