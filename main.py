@@ -31,10 +31,6 @@ def init_db():
                 FOREIGN KEY(user_id) REFERENCES users(id)
             )
         ''')
-        #          TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD
-        #      TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD
-        # TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD
-        #    TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD TODO: MOOD
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,6 +47,17 @@ def init_db():
                 FOREIGN KEY(user_id) REFERENCES users(id),
                 FOREIGN KEY(track_id) REFERENCES tracks(id),
                 UNIQUE(user_id, track_id)
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_id INTEGER,
+                track_id INTEGER,
+                category TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(sender_id) REFERENCES users(id),
+                FOREIGN KEY(track_id) REFERENCES tracks(id)
             )
         ''')
 init_db()
@@ -71,6 +78,11 @@ class User(BaseModel):
 class Follow(BaseModel):
     user_id: int
     track_id: int
+
+class Report(BaseModel):
+    sender_id: int
+    track_id: int
+    category: str
 
 class DeleteRequest(BaseModel):
     track_id: int
@@ -276,3 +288,12 @@ def unfollow_track(follow: Follow):
         ''', (follow.user_id, follow.track_id))
         conn.commit()
         return {"status": "unfollowed"}
+    
+@app.post("/report")
+def report_track(report: Report):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO reports (sender_id, track_id, category) VALUES (?, ?, ?)",
+                       (report.sender_id, report.track_id, report.category))
+        conn.commit()
+    return {"status": "ok"}
