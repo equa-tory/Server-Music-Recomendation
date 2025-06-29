@@ -61,6 +61,9 @@ class Follow(BaseModel):
     user_id: int
     track_id: int
 
+class DeleteRequest(BaseModel):
+    track_id: int
+
 @app.post("/submit")
 def submit_track(track: Track):
     # Проверка и генерация ссылки, если она пустая
@@ -77,11 +80,57 @@ def submit_track(track: Track):
         conn.commit()
     return {"status": "ok"}
 
+@app.post("/delete")
+def delete_track(data: DeleteRequest):
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            DELETE FROM tracks
+            WHERE id = ?
+        ''', (data.track_id,))
+        conn.commit()
+    return {"status": "deleted"}
+
 @app.get("/tracks")
-def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none"):
+def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none", profile: bool = False):
     offset = (page - 1) * limit
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
+
+        if profile:
+            total_query = 'SELECT COUNT(*) FROM tracks WHERE user_id = ?'
+            cursor.execute(total_query, (user_id,))
+            total = cursor.fetchone()[0]
+
+            query = '''
+                SELECT t.id, t.title, t.author, t.url, t.mood, t.comment, t.timestamp
+                FROM tracks t
+                WHERE t.user_id = ?
+                ORDER BY t.timestamp DESC
+                LIMIT ? OFFSET ?
+            '''
+            cursor.execute(query, (user_id, limit, offset))
+            rows = cursor.fetchall()
+
+            cursor.execute("SELECT track_id FROM follows WHERE user_id = ?", (user_id,))
+            followed_ids = [row[0] for row in cursor.fetchall()]
+
+            return {
+                "total": total,
+                "data": [
+                    {
+                        "id": row[0],
+                        "title": row[1],
+                        "author": row[2],
+                        "url": row[3],
+                        "mood": row[4],
+                        "comment": row[5],
+                        "timestamp": row[6]
+                    }
+                    for row in rows
+                ],
+                "followed_ids": followed_ids
+            }
 
         cursor.execute("SELECT COUNT(*) FROM tracks")
         total = cursor.fetchone()[0]
@@ -93,6 +142,9 @@ def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none"):
             order_by = "CASE WHEN f.user_id = ? THEN 0 ELSE 1 END, t.timestamp DESC"
         elif sort == "week":
             order_by = "(SELECT COUNT(*) FROM follows WHERE track_id = t.id AND DATE(timestamp) >= DATE('now', '-7 day')) DESC"
+        elif "mood" in sort:
+            mood_index = int(sort.split(":")[1])
+            order_by = f"t.mood = {mood_index} DESC"
         else:
             order_by = "t.timestamp DESC"
 
@@ -128,9 +180,11 @@ def get_tracks(user_id: int, page: int = 1, limit: int = 5, sort: str = "none"):
             ],
             "followed_ids": followed_ids
         }
-    
+
 @app.post("/user")
 def submit_track(user: User):
+    if not (2 <= len(user.login) <= 16):
+        raise HTTPException(status_code=400, detail="Login and password must be 2–16 characters long")
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
         # Проверка существования пользователя
