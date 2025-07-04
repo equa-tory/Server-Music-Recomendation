@@ -230,7 +230,7 @@ def get_moods():
         return [{"id": row[0], "name": row[1]} for row in rows]
 
 @app.post("/user")
-def submit_track(user: User):
+def submit_user(user: User):
     if not (2 <= len(user.login) <= 16):
         raise HTTPException(status_code=400, detail="Login and password must be 2–16 characters long")
     with sqlite3.connect(DB_FILE) as conn:
